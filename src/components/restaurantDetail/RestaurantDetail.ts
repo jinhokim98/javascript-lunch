@@ -1,6 +1,6 @@
 import './RestaurantDetail.css';
-import { Restaurant as RestaurantType, CategoryType } from "../../types";
-import CategoryImage from "../categoryImage/CategoryImage";
+import { Restaurant as RestaurantType, CategoryType } from '../../types';
+import CategoryImage from '../categoryImage/CategoryImage';
 import FavoriteIcon, { IconStateChangeEvent } from '../favoriteIcon/FavoriteIcon';
 import { Button, ButtonProps } from '../tag/button';
 import Modal from '../modal/Modal';
@@ -9,40 +9,40 @@ import storage from '../../storage';
 import LOCAL_STORAGE_KEY from '../../constants/LocalStorageKey';
 import DOM from '../../utils/DOM';
 import Restaurant from '../restaurant/Restaurant';
+import TabPane from '../TabPane';
 
 const { $ } = DOM;
-const { FAVORITE_DATA } = LOCAL_STORAGE_KEY;
-
-export interface RestaurantDeleteEvent extends CustomEvent {
-  detail: {
-    targetId: string;
-  }
-}
+const { MATZIP_DATA, FAVORITE_DATA } = LOCAL_STORAGE_KEY;
 
 class RestaurantDetail extends HTMLDivElement {
   private favoriteIcon: FavoriteIcon;
-  private cancelButton: Button;
-  private deleteButton: Button;
+  private modal: Modal;
 
-  constructor(restaurant: RestaurantType, favoriteIcon: FavoriteIcon) {
-    super();    
+  constructor(restaurant: RestaurantType, favoriteIcon: FavoriteIcon, modal: Modal) {
+    super();
     this.id = restaurant.id;
     this.className = 'detail__container';
+    this.modal = modal;
     this.createLayout(restaurant);
-    const { cancelButton, deleteButton } = this.createButtons();
-    this.cancelButton = cancelButton;
-    this.deleteButton = deleteButton;    
+
     this.favoriteIcon = favoriteIcon;
     this.appendChild(this.favoriteIcon);
-    this.listenRerender();    
+
+    this.setEvent();
   }
 
-  createLayout({category, name, distance, introduction, link}: RestaurantType) {    
+  setEvent() {
+    this.listenBackdropClick();
+    this.listenRerender();
+  }
+
+  createLayout({ category, name, distance, introduction, link }: RestaurantType) {
     this.createCategoryImage(category);
     this.createRestaurantName(name);
     this.createDistance(distance);
     this.createIntroduction(introduction);
     this.createLink(link);
+    this.createButtons();
   }
 
   createCategoryImage(category: CategoryType) {
@@ -77,13 +77,13 @@ class RestaurantDetail extends HTMLDivElement {
     if (link === undefined || link === '') {
       this.createLinkFallback();
       return;
-    };    
+    }
 
     const a = document.createElement('a');
     a.classList.add('restaurant__link', 'text-body', 'detail__field');
     a.href = link;
     a.textContent = link;
-    a.target = 'blank'
+    a.target = 'blank';
     this.appendChild(a);
   }
 
@@ -100,60 +100,38 @@ class RestaurantDetail extends HTMLDivElement {
 
     const deleteButton: ButtonProps = {
       type: 'button',
-      classnames: ['button', 'text-caption', 'delete-restaurant-button'],
+      classnames: ['button', 'text-caption'],
       varient: 'secondary',
       children: '삭제하기',
+      onClick: this.deleteRestaurant.bind(this),
     };
+
     const cancelButton: ButtonProps = {
       type: 'button',
-      classnames: ['button', 'text-caption', 'detail-modal--close'],
+      classnames: ['button', 'text-caption'],
       varient: 'primary',
       children: '닫기',
+      onClick: this.modal.toggleModal.bind(this.modal),
     };
 
     const buttons = {
-      cancelButton: new Button(cancelButton),
       deleteButton: new Button(deleteButton),
-    }
+      cancelButton: new Button(cancelButton),
+    };
 
     buttonContainer.appendChild(buttons.deleteButton);
     buttonContainer.appendChild(buttons.cancelButton);
     this.appendChild(buttonContainer);
-    return buttons;
-  }
-
-  listenCloseButtonClick() {        
-    this.cancelButton.addEventListener('click', () => {      
-      (this.parentElement?.parentElement as Modal).toggleModal('detail-modal');
-    });
-  }
-
-  listenDeleteButonClick(toggleModal: Function) { 
-    this.deleteButton.addEventListener('click', () => {
-      if (window.confirm('정말 삭제하시겠습니까?')) {
-        toggleModal();
-        this.dispatchRestaurantDeleteEvent();
-      }
-    })
-  }
-
-  private dispatchRestaurantDeleteEvent() {
-    const restaurantDeleteEvent = new CustomEvent('deleteRestaurant', {
-      detail: {
-        targetId: this.id,
-      }
-    });        
-    document.dispatchEvent(restaurantDeleteEvent);
   }
 
   getChangeState(id: string) {
     return {
       addFavorite: () => {
         App.matzip.addFavorite(id);
-        storage.addData<string>(FAVORITE_DATA, id);     
+        storage.addData<string>(FAVORITE_DATA, id);
       },
       deleteFavorite: () => {
-        App.matzip.deleteFavorite(id);        
+        App.matzip.deleteFavorite(id);
         storage.modifyData<string>(FAVORITE_DATA, App.matzip.getMyFavorites());
       },
       targetId: id,
@@ -163,16 +141,34 @@ class RestaurantDetail extends HTMLDivElement {
   listenRerender() {
     document.addEventListener('iconStateChange', (event: Event) => {
       const iconStateChangeEvent = event as IconStateChangeEvent;
-      const {targetId, state} = iconStateChangeEvent.detail;
-      
-      const newElement = new FavoriteIcon({active: state, isChild: false, changeState: this.getChangeState(targetId) });
+      const { targetId, state } = iconStateChangeEvent.detail;
+
+      const newElement = new FavoriteIcon({
+        active: state,
+        isChild: false,
+        changeState: this.getChangeState(targetId),
+      });
       const target = $<Restaurant>(`#restaurant-list${targetId}`);
-      const oldElement = target.querySelector('.favorite-icon-origin') as Node; 
+      const oldElement = target.querySelector('.favorite-icon-origin') as Node;
       $<Restaurant>(`#restaurant-list${targetId}`).replaceChild(newElement, oldElement);
     });
   }
+
+  deleteRestaurant() {
+    if (window.confirm('정말 삭제하시겠습니까?')) {
+      this.modal.toggleModal.bind(this.modal);
+      App.matzip.delete(this.id);
+      storage.modifyData<RestaurantType>(MATZIP_DATA, App.matzip.getRestaurants());
+      const tabPane = $<TabPane>('.tabpane');
+      tabPane.showListDelete(this.id);
+    }
+  }
+
+  listenBackdropClick() {
+    this.modal.listenBackdropClick();
+  }
 }
 
-customElements.define('matzip-restaurant-detail-modal', RestaurantDetail, {extends: 'div'});
+customElements.define('matzip-restaurant-detail-modal', RestaurantDetail, { extends: 'div' });
 
 export default RestaurantDetail;

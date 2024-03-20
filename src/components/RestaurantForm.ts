@@ -1,5 +1,12 @@
+import App from '../app';
 import Condition from '../constants/Condition';
+import storage from '../storage';
+import LOCAL_STORAGE_KEY from '../constants/LocalStorageKey';
+import { CategoryType, Restaurant as RestaurantType } from '../types';
+
 import FormItem from './formItem/FormItem';
+import Modal from './modal/Modal';
+import DOM from '../utils/DOM';
 
 import { Button, ButtonProps } from './tag/button';
 import { CaptionProps } from './tag/caption';
@@ -8,15 +15,23 @@ import { LabelProps } from './tag/label';
 import { OptionProps } from './tag/option';
 import { Select, SelectProps } from './tag/select';
 import { TextArea, TextAreaProps } from './tag/textarea';
+import Restaurant from './restaurant/Restaurant';
+import TabPane from './TabPane';
 
 const { REGULAR_EXPRESSION } = Condition;
+const { MATZIP_DATA } = LOCAL_STORAGE_KEY;
+const { $ } = DOM;
 
 class RestaurantForm extends HTMLFormElement {
-  constructor() {
+  private modal: Modal;
+
+  constructor(modal: Modal) {
     super();
     this.id = 'restaurant-form';
     this.submitButton = null;
+    this.modal = modal;
     this.createElements();
+    this.listenSubmitEvent();
   }
 
   createElements() {
@@ -180,7 +195,9 @@ class RestaurantForm extends HTMLFormElement {
       classnames: ['button', 'text-caption', 'modal--close'],
       varient: 'secondary',
       children: '취소하기',
+      onClick: this.modal.toggleModal.bind(this.modal),
     };
+
     const submitButton: ButtonProps = {
       type: 'submit',
       classnames: ['button', 'text-caption', 'form-submit'],
@@ -197,8 +214,10 @@ class RestaurantForm extends HTMLFormElement {
   }
 
   getFormFields(): Array<Select | TextArea | Input> {
-    const formFields = [...this.children].filter((children) => children.className.includes('form-item'));
-    
+    const formFields = [...this.children].filter((children) =>
+      children.className.includes('form-item'),
+    );
+
     return formFields.map((field) => {
       const inputField = Array.from(field.children).find((child) => this.getInputField(child));
       return inputField as Select | TextArea | Input;
@@ -210,9 +229,9 @@ class RestaurantForm extends HTMLFormElement {
   }
 
   updateButtonState() {
-    const formFields = this.getFormFields();    
-    const allFieldsValid = formFields.every(field => field.isValidate());  
-    
+    const formFields = this.getFormFields();
+    const allFieldsValid = formFields.every((field) => field.isValidate());
+
     if (allFieldsValid) {
       this.submitButton.removeAttribute('disabled');
     } else {
@@ -223,10 +242,38 @@ class RestaurantForm extends HTMLFormElement {
   setupValidation() {
     const formFields = this.getFormFields();
 
-    formFields.forEach(field => {
+    formFields.forEach((field) => {
       field.addEventListener('input', () => {
         this.updateButtonState();
       });
+    });
+  }
+
+  listenSubmitEvent() {
+    this.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formFields = this.getFormFields();
+      const fieldValues = formFields.map((field) => field.getValue());
+
+      const newRestaurant: RestaurantType = {
+        id: `matzip${crypto.randomUUID().replace(/-/g, '')}`,
+        category: fieldValues[0] as CategoryType,
+        name: fieldValues[1],
+        distance: Number(fieldValues[2]),
+        introduction: fieldValues[3],
+        link: fieldValues[4],
+      };
+
+      try {
+        App.matzip.add(newRestaurant);
+        storage.addData(MATZIP_DATA, newRestaurant);
+        const tabPane = $<TabPane>('.tabpane');
+        tabPane.showListAppend(new Restaurant(newRestaurant, false));
+        this.reset();
+        this.modal.toggleModal();
+      } catch (error) {
+        alert(error);
+      }
     });
   }
 }

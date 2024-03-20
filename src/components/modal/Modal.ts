@@ -1,9 +1,7 @@
 import './modal.css';
 
 interface ModalProps {
-  classname: string;
   title?: string;
-  child: HTMLElement;
 }
 
 class Modal extends HTMLDivElement {
@@ -12,22 +10,23 @@ class Modal extends HTMLDivElement {
 
   constructor(props: ModalProps) {
     super();
-    this.className = props.classname;
-    this.modalBackdrop = this.createBackdrop(props);
-    this.modalContainer = this.createModalContainer(props);    
+    this.className = 'modal';
+    this.modalBackdrop = this.createBackdrop();
+    this.modalContainer = this.createModalContainer(props);
+    this.listenBackdropClick();
   }
 
-  createBackdrop({classname}: ModalProps) {
+  createBackdrop() {
     const modalBackdrop = document.createElement('div');
-    modalBackdrop.className = `${classname}-backdrop`;
+    modalBackdrop.className = 'modal-backdrop';
     this.appendChild(modalBackdrop);
     return modalBackdrop;
   }
 
-  createModalContainer({classname, child, title}: ModalProps) {
+  createModalContainer({ title }: ModalProps) {
     const modalContainer = document.createElement('div');
-    modalContainer.className = `${classname}-container`;
-    
+    modalContainer.className = 'modal-container';
+
     if (title !== undefined) {
       const modalTitle = document.createElement('h2');
       modalTitle.className = 'modal-title';
@@ -36,10 +35,13 @@ class Modal extends HTMLDivElement {
       modalTitle.classList.add(...modalTitleClassList);
       modalContainer.appendChild(modalTitle);
     }
-    
-    modalContainer.appendChild(child);
+
     this.appendChild(modalContainer);
     return modalContainer;
+  }
+
+  appendChildNode(child: HTMLElement) {
+    this.modalContainer.appendChild(child);
   }
 
   stopEventBubbling() {
@@ -48,14 +50,14 @@ class Modal extends HTMLDivElement {
     });
   }
 
-  backdropClick(modal: Modal, classname: string) {    
-    this.modalBackdrop.addEventListener('click', () => {      
-      modal.toggleModal(classname);
-    })
+  listenBackdropClick() {
+    this.modalBackdrop.addEventListener('click', () => {
+      this.toggleModal();
+    });
   }
 
-  toggleModal(classname: string) {
-    this.classList.toggle(`${classname}--open`);
+  toggleModal() {
+    this.classList.toggle('modal--open');
   }
 }
 

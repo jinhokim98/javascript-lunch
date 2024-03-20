@@ -1,7 +1,9 @@
-import FilterContainer from "./FilterContainer";
-import ListContainer from "./listContainer/ListContainer";
-import DOM from "../utils/DOM";
-import Restaurant from "./restaurant/Restaurant";
+import FilterContainer from './FilterContainer';
+import ListContainer from './listContainer/ListContainer';
+import DOM from '../utils/DOM';
+import Restaurant from './restaurant/Restaurant';
+import App from '../app';
+import { CategoryType, SortType } from '../types';
 
 const { $ } = DOM;
 
@@ -34,7 +36,7 @@ class TabPane extends HTMLElement {
 
   showContent(tabPaneProps: TabPaneProps) {
     this.removeTabPane();
-    
+
     const { filterContainer, listContainer } = tabPaneProps;
     if (filterContainer !== undefined) {
       this.appendChild(filterContainer);
@@ -59,8 +61,26 @@ class TabPane extends HTMLElement {
     this.listContainer?.deleteRestaurant(targetId);
   }
 
+  createWholeRestaurant() {
+    const filterContainer = new FilterContainer();
+    const { category, sort } = filterContainer.getFilterValues();
+    const restaurantElements: Restaurant[] = App.matzip
+      .filterAndSort(category as CategoryType, sort as SortType)
+      .map((restaurant) => new Restaurant(restaurant, App.matzip.isFavorite(restaurant.id)));
+    const listContainer = new ListContainer(restaurantElements);
+
+    this.showContent({ filterContainer, listContainer });
+  }
+
+  createMyFavoriteList() {
+    const favoriteRestaurants: Restaurant[] = App.matzip
+      .getMyFavoriteRestaurants()
+      .map((restaurant) => new Restaurant(restaurant, true));
+    const listContainer = new ListContainer(favoriteRestaurants);
+    this.showContent({ listContainer });
+  }
 }
 
-customElements.define('matzip-tabpane', TabPane, {extends: 'section'});
+customElements.define('matzip-tabpane', TabPane, { extends: 'section' });
 
 export default TabPane;
